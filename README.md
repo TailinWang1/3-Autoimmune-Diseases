@@ -1,1 +1,1 @@
-# Autoimmune-Diseases-and-Alzheimer-s-Disease
+# Autoimmune-Diseases-and-AD

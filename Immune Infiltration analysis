@@ -1,0 +1,112 @@
+library(ggsci)
+library(tidyr)
+library(ggpubr)
+library(stringr) 
+library(tidyverse) 
+library(pheatmap)
+library(ggplot2) 
+library(ggpubr)
+library(paletteer) 
+library(corrplot) 
+library(rstatix) 
+RA_gset <- getGEO('GSE205962', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+RA_exp <- exprs(RA_gset[[1]])
+RA_GPL <- fData(RA_gset[[1]])
+RA_gpl <- RA_GPL[, c(1, 15)]
+RA_exp <- as.data.frame(RA_exp)
+RA_exp$ID <- rownames(RA_exp)
+RA_exp_symbol <- merge(RA_exp, RA_gpl, by="ID")
+RA_exp_symbol <- na.omit(RA_exp_symbol)
+table(duplicated(RA_exp_symbol$`Gene Symbol`))
+RA_datExpr02 <- avereps(RA_exp_symbol[,-c(1, ncol(RA_exp_symbol))], ID=RA_exp_symbol$`Gene Symbol`)
+datExpr0 <- t(RA_datExpr02)
+b <- read_excel("RA-Immune_Infiltration03.xlsx", sheet = 1)
+b <- as.data.frame(b)
+rownames(b) <- b[[1]]
+b <- b[-1]
+a <- read.table("CIBERSORTx_Job1_Results.txt", sep="\t", row.names=1, check.names=FALSE, header=TRUE)
+a <- a[,1:22]
+identical(rownames(a), rownames(b))
+class(b$group)
+a$group <- b$group 
+a <- a %>% rownames_to_column("sample") 
+b <- gather(a, key=CIBERSORT, value=Proportion, -c(group, sample))
+my_colors <- c("#66B2FF", "#FFFF00")
+ggboxplot(b, x="CIBERSORT", y="Proportion",
+          fill="group", palette=my_colors) +
+  stat_compare_means(aes(group=group),
+                     method="wilcox.test",
+                     label="p.signif",
+                     symnum.args=list(cutpoints=c(0, 0.001, 0.01, 0.05, 1),
+                                      symbols=c("***","**","*","ns"))) +
+  theme(text=element_text(size=10),
+        axis.text.x=element_text(angle=45, hjust=1))
+dev.off()
+expression_data <- datExpr0[, "ROMO1", drop=FALSE]  
+identical(rownames(a), rownames(expression_data))  
+resm <- t(a) 
+exp_genes <- t(expression_data) 
+rb <- rbind(resm, exp_genes) 
+rownames(rb) 
+rbcor <- cor(t(rb))
+rbcor <- rbcor[, !(colnames(rbcor) %in% c("Macrophages M2", "Eosinophils", "sample", "group"))]
+rownames(rbcor)
+rbcorp <- cor.mtest(rbcor, conf.level=.95)
+genes <- "ROMO1" 
+p.mat2 <- rbcorp$p
+split_cor <- rbcor[genes, , drop=FALSE]
+split <- t(split_cor)
+splitp <- p.mat2[genes, , drop=FALSE]
+splitp <- t(splitp)
+mark <- matrix("", nrow = nrow(splitp), ncol = ncol(splitp))
+mark[splitp < 0.001] <- "***"
+mark[splitp >= 0.001 & splitp < 0.01] <- "**"
+mark[splitp >= 0.01 & splitp < 0.05] <- "*"
+col2 <- colorRampPalette(c("#2166AC", "white", "#B2182B"))(100)
+pheatmap(t(split),
+         display_numbers = t(mark),
+         number_color = "black",
+         fontsize_number = 16,
+         color = col2,
+         border_color = "white",
+         treeheight_col = 0,
+         treeheight_row = 0,
+         cluster_rows = FALSE,  
+         cluster_cols = FALSE, 
+         fontsize_col = 10,
+         fontsize_row = 10,
+         angle_col = 90)
+# MS & T1D Immune Infiltration same to RA
+#Validation
+# Validation1—Two sample MR
+library(TwoSampleMR)
+library(pleio)
+library(readxl)
+library(dplyr)
+library(ieugwasr)
+ROMO1<- extract_instruments(outcomes = "eqtl-a-ENSG00000106153",p1=5e-06)
+dat<-gwasvcf_to_TwoSampleMR(dat)
+ROMO1<-dat
+filtered_ROMO1 <- subset(dat, pval.exposure< 5e-06)
+ROMO1_sorted <- ROMO1[order(ROMO1$P), ]
+filtered_ROMO1$`F-statistic` <- (filtered_ROMO1$beta.exposure^2) / (filtered_ROMO1$se.exposure^2)
+RA_outcome_dat <- extract_outcome_data(snps = filtered_ROMO1$SNP, outcomes = 'finn-b-RHEUMA_NOS')
+MS_outcome_dat <- extract_outcome_data(snps = filtered_ROMO1$SNP, outcomes = 'ieu-a-1024')
+T1D_outcome_dat<- extract_outcome_data(snps = filtered_ROMO1$SNP, outcomes = 'ebi-a-GCST90014023')
+dat_RA<- harmonise_data(exposure_dat =filtered_ROMO1,  outcome_dat = RA_outcome_dat)
+dat_MS<- harmonise_data(exposure_dat =filtered_ROMO1,  outcome_dat = MS_outcome_dat)
+dat_T1D<- harmonise_data(exposure_dat =filtered_ROMO1,  outcome_dat = T1D_outcome_dat)
+res_RA <- mr(dat_RA)
+res_MS <- mr(dat_MS)
+res_T1D <- mr(dat_T1D)
+pleio_RA<- mr_pleiotropy_test(dat_RA)
+OR_RA<-generate_odds_ratios(res_RA)
+het_RA <- mr_heterogeneity(dat_RA)
+pleio_MS<- mr_pleiotropy_test(dat_MS)
+OR_MS<-generate_odds_ratios(res_MS)
+het_MS <- mr_heterogeneity(dat_MS)
+pleio_T1D<- mr_pleiotropy_test(dat_T1D)
+OR_T1D<-generate_odds_ratios(res_T1D)
+het_T1D <- mr_heterogeneity(dat_T1D)
+# Validation2—External GEO data(Similar to the code provided earlier)
+# Validation3—ROSGs data(Similar to the code provided earlier)

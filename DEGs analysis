@@ -1,1 +1,26 @@
+library(dplyr)
+library(readr)
+process_gene_data <- function(file_path, gene_col_name) {
+  
+  gene_data <- read.delim(file_path, header = TRUE, sep = "\t")
+  
+  # Filter genes with adjusted P-value < 0.05
+  filtered_genes <- gene_data %>% filter(adj.P.Val < 0.05)
+  
+  # Extract unique gene symbols
+  unique_genes <- filtered_genes[[gene_col_name]] %>% unique()
+  
+  # Remove empty values
+  cleaned_genes <- unique_genes[unique_genes != ""]
+  
+  return(cleaned_genes)
+}
 
+# Process each gene data file
+ra_genes <- process_gene_data("RA.top.table.tsv", "Gene.Symbol")
+ms_genes <- process_gene_data("MS.top.table.tsv", "Gene.symbol")
+t1d_genes <- process_gene_data("T1D.top.table.tsv", "Gene.symbol")
+
+# Find the intersection of the gene sets
+common_genes <- Reduce(intersect, list(ra_genes, ms_genes, t1d_genes))
+print(common_genes)

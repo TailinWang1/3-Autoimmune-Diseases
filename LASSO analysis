@@ -1,0 +1,75 @@
+library(glmnet)
+library(survival)
+library(tidyverse)
+library(GEOquery)
+
+get_and_preprocess_data <- function(gse_id, gene_column_index, gene_symbol_column) {
+  gset <- getGEO(gse_id, destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+  exp <- exprs(gset[[1]])
+  gpl <- fData(gset[[1]])
+  gpl <- gpl[, c(1, gene_column_index)]
+  
+  exp <- as.data.frame(exp)
+  exp$ID <- rownames(exp)
+  exp_symbol <- merge(exp, gpl, by="ID")
+  exp_symbol <- na.omit(exp_symbol)
+  
+  exp_symbol <- exp_symbol[!duplicated(exp_symbol[[gene_symbol_column]]), ]
+  datExpr <- t(avereps(exp_symbol[,-c(1, ncol(exp_symbol))], ID=exp_symbol[[gene_symbol_column]]))
+  
+  return(datExpr)
+}
+
+# Define function to perform LASSO regression
+perform_lasso <- function(data, common_genes, group, output_prefix) {
+  set.seed(1)
+  
+  # Select common genes
+  selected_genes_data <- data[, common_genes, drop = FALSE]
+  
+  x <- as.matrix(selected_genes_data)
+  y <- as.factor(group)
+  
+  cvla <- glmnet(x, y, family='binomial')
+  cv.fit <- cv.glmnet(x, y, family='binomial')
+  
+  # Save plots
+  pdf(paste0(output_prefix, "_LASSO_cvla_plot.pdf"))
+  plot(cvla, xvar='lambda', label=TRUE)
+  dev.off()
+  
+  pdf(paste0(output_prefix, "_LASSO_cv_fit_plot.pdf"))
+  plot(cv.fit)
+  dev.off()
+  
+  # Extract LASSO gene coefficients
+  coef <- coef(cvla, s=cv.fit$lambda.1se)
+  index <- which(coef != 0)
+  actcoef <- coef[index]
+  LassoGene <- rownames(coef)[index]
+  
+  gene_coef_df <- cbind(Gene=LassoGene, coef=actcoef)
+  write.csv(gene_coef_df, paste0(output_prefix, "_LASSO.csv"), row.names=FALSE)
+}
+
+# Define main function
+main <- function() {
+  
+  # RA data processing
+  ra_data <- get_and_preprocess_data('GSE205962', 15, 'Gene Symbol')
+  ra_group <- c(rep(1, 16), rep(0, 4))
+  perform_lasso(ra_data, common_genes, ra_group, "RA_GSE205962")
+  
+  # MS data processing
+  ms_data <- get_and_preprocess_data('GSE17048', 3, 'Gene symbol')
+  ms_group <- c(rep(0, 45), rep(1, 99))
+  perform_lasso(ms_data, common_genes, ms_group, "MS_GSE17048")
+  
+  # T1D data processing
+  t1d_data <- get_and_preprocess_data('GSE44314', 3, 'Gene symbol')
+  t1d_group <- c(rep(1, 10), rep(0, 6))
+  perform_lasso(t1d_data, common_genes, t1d_group, "T1D_GSE44314")
+}
+
+# Run main function
+main()

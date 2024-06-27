@@ -1,0 +1,127 @@
+library(GEOquery)
+library(limma)
+library(ggplot2)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(pheatmap)
+library(enrichplot)
+library(dplyr)
+RA_gset <- getGEO('GSE205962', destdir=".",AnnotGPL = T,getGPL = T)
+RA_exp<-exprs(RA_gset[[1]])
+RA_GPL<-fData(RA_gset[[1]])
+RA_gpl<- RA_GPL[, c(1, 15)]
+RA_exp<-as.data.frame(RA_exp)
+RA_exp$ID<-rownames(RA_exp)
+RA_exp_symbol<-merge(RA_exp,RA_gpl,by="ID")
+RA_exp_symbol<-na.omit(RA_exp_symbol)
+table(duplicated(RA_exp_symbol$`Gene Symbol`))
+RA_datExpr02<-avereps(RA_exp_symbol[,-c(1,ncol(RA_exp_symbol))],ID=RA_exp_symbol$`Gene Symbol`)
+sgene="ROMO1"
+data=avereps(RA_datExpr02)
+group <- ifelse(data[c(sgene),]>median(data[c(sgene),]), "High", "Low")   
+group <- factor(group,levels = c("High","Low"))
+design <- model.matrix(~0+group)
+colnames(design) <- levels(group)
+fit <- lmFit(data,design)
+cont.matrix<-makeContrasts(High-Low,levels=design)
+fit2 <- contrasts.fit(fit, cont.matrix)
+fit2 <- eBayes(fit2)
+deg=topTable(fit2,adjust='fdr',number=nrow(data))
+Diff=deg
+DIFFOUT=rbind(id=colnames(Diff),Diff)
+write.table(DIFFOUT,file=paste0("1.","RA_DIFF_all.xls"),sep="\t",quote=F,col.names=F)
+Diff=Diff[order(as.numeric(as.vector(Diff$logFC))),]
+diffGene=as.vector(rownames(Diff))
+diffLength=length(diffGene)
+afGene=c()
+if(diffLength>(60)){
+  afGene=diffGene[c(1:30,(diffLength-30+1):diffLength)]
+}else{
+  afGene=diffGene
+}
+afExp=data[afGene,]
+Type1=as.data.frame(group)
+Type1=Type1[order(Type1$group,decreasing = T),,drop=F]
+Type=Type1[,1]
+names(Type)=rownames(Type1)
+Type=as.data.frame(Type)
+anncolor=list(Type=c(High="red",Low="blue"  ))
+pheatmap(afExp[,rownames(Type1)],                                                                     
+         annotation=Type,                                                           
+         color = colorRampPalette(c("blue","white","red"))(50),     
+         cluster_cols =F,                                                           
+         show_colnames = F,                                                        
+         scale="row", 
+         fontsize = 10,
+         fontsize_row=6,
+         fontsize_col=8,
+         annotation_colors=anncolor
+)
+
+adjP <- 0.05
+aflogFC <- 0.5
+
+Diff$Significant <- ifelse(Diff$P.Value < adjP & Diff$logFC > aflogFC, "Up",
+                           ifelse(Diff$P.Value < adjP & Diff$logFC < -aflogFC, "Down", "Not"))
+
+p <- ggplot(Diff, aes(logFC, -log10(P.Value))) +
+  geom_point(aes(col=Significant), size=4) +  
+  scale_color_manual(values=c(pal_npg()(2)[2], "#838B8B", pal_npg()(1))) +
+  labs(title = " ") +
+  theme(plot.title = element_text(size = 16, hjust = 0.5, face = "bold")) +
+  geom_hline(aes(yintercept=-log10(adjP)), colour="gray", linetype="twodash", linewidth=1) + 
+  geom_vline(aes(xintercept=aflogFC), colour="gray", linetype="twodash", linewidth=1) +  
+  geom_vline(aes(xintercept=-aflogFC), colour="gray", linetype="twodash", linewidth=1)  
+
+p
+point.Pvalue=0.05
+point.logFc=1.5
+logFC_t=0
+deg$g=ifelse(deg$P.Value>0.05,'stable',
+             ifelse( deg$logFC > logFC_t,'UP',
+                     ifelse( deg$logFC < -logFC_t,'DOWN','stable') )
+)
+table(deg$g)
+deg$symbol=rownames(deg)
+df <- bitr(unique(deg$symbol), fromType = "SYMBOL",
+           toType = c( "ENTREZID"),
+           OrgDb = org.Hs.eg.db)
+DEG=deg
+DEG=merge(DEG,df,by.y='SYMBOL',by.x='symbol')
+data_all_sort <- DEG %>% 
+  arrange(desc(logFC))
+geneList = data_all_sort$logFC
+names(geneList) <- data_all_sort$ENTREZID 
+head(geneList)
+
+kk2<- gseKEGG(geneList     = geneList,
+              organism = 'hsa',
+              nPerm        = 10000,
+              minGSSize    = 10,
+              maxGSSize    = 200,
+              pvalueCutoff = 0.05,
+              pAdjustMethod = "none" )
+kk1 <- gseGO(geneList = geneList,
+             nPerm = 10000,
+             minGSSize = 10,
+             maxGSSize = 200,
+             pvalueCutoff = 0.05,
+             pAdjustMethod = "none",
+             ont = "BP",
+             OrgDb = org.Hs.eg.db)
+dotplot(kk1)
+class(kk1)
+colnames(kk1@result)
+kegg_result <- as.data.frame(kk1)
+rownames(kk1@result)[head(order(kk1@result$enrichmentScore))]
+af1=as.data.frame(kk1@result)
+write.table(af1,file=paste0("2.","RA_GSEA_GO.xls"),sep="\t",quote=F,col.names=T)
+class(kk2)
+colnames(kk2@result)
+kegg_result <- as.data.frame(kk2)
+rownames(kk2@result)[head(order(kk2@result$enrichmentScore))]
+af=as.data.frame(kk2@result)
+write.table(af,file=paste0("2.","RA_GSEA_KEGG.xls"),sep="\t",quote=F,col.names=T)
+num=5
+gseaplot2(kk2, geneSetID = rownames(kk2@result)[c(head(order(kk2@result$enrichmentScore),num),tail(order(kk2@result$enrichmentScore),num))])
+#MS & T1D single gene GSEA analysis same to RA

@@ -5,7 +5,7 @@ library(pleio)
 library(readxl)
 library(dplyr)
 library(ieugwasr)
-ROMO1<- extract_instruments(outcomes = "eqtl-a-ENSG00000106153",p1=5e-06)
+dat<-readVcf("eqtl-a-ENSG00000125995.vcf.gz")
 dat<-gwasvcf_to_TwoSampleMR(dat)
 ROMO1<-dat
 filtered_ROMO1 <- subset(dat, pval.exposure< 5e-06)

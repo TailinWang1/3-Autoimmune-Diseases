@@ -753,3 +753,5 @@ t_test_RA <- t.test(RA$ROMO1, HC$ROMO1, alternative = "two.sided", var.equal = F
 t_test_MS <- t.test(MS$ROMO1, HC$ROMO1, alternative = "two.sided", var.equal = FALSE)
 
 
+
+

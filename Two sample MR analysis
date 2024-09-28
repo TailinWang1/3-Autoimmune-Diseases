@@ -5,11 +5,12 @@ library(pleio)
 library(readxl)
 library(dplyr)
 library(ieugwasr)
-dat<-readVcf("eqtl-a-ENSG00000125995.vcf.gz")
-dat<-gwasvcf_to_TwoSampleMR(dat)
-ROMO1<-dat
-filtered_ROMO1 <- subset(dat, pval.exposure< 5e-06)
-ROMO1_sorted <- ROMO1[order(ROMO1$P), ]
+filtered_ROMO1<- extract_instruments(
+  outcomes = "eqtl-a-ENSG00000125995", 
+  p1 = 5e-06, 
+  clump = TRUE, 
+  r2 = 0.001,
+  kb=100)
 filtered_ROMO1$`F-statistic` <- (filtered_ROMO1$beta.exposure^2) / (filtered_ROMO1$se.exposure^2)
 RA_outcome_dat <- extract_outcome_data(snps = filtered_ROMO1$SNP, outcomes = 'finn-b-RHEUMA_NOS')
 MS_outcome_dat <- extract_outcome_data(snps = filtered_ROMO1$SNP, outcomes = 'ieu-a-1024')
@@ -29,5 +30,6 @@ het_MS <- mr_heterogeneity(dat_MS)
 pleio_T1D<- mr_pleiotropy_test(dat_T1D)
 OR_T1D<-generate_odds_ratios(res_T1D)
 het_T1D <- mr_heterogeneity(dat_T1D)
+#Data from 30 monocytes were analysed similarly to the above
 # Validation2—External GEO data(Similar to the code provided earlier)
 # Validation3—ROSGs data(Similar to the code provided earlier)

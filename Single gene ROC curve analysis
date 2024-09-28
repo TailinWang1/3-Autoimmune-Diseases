@@ -1,0 +1,329 @@
+required_packages <- c("GEOquery", "limma", "pROC", "ggplot2", "sva")
+gse56649 <- getGEO('GSE56649', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse15573 <- getGEO('GSE15573', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse205962 <- getGEO('GSE205962', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+groups_56649 <- factor(c(rep("RA", 13), rep("HC", 9)))
+groups_15573 <- factor( c(
+  "RA", "RA", "Control", "RA", "Control", "RA", "Control", "Control", "RA", 
+  "Control", "Control", "RA", "Control", "RA", "RA", "Control", "RA", 
+  "Control", "RA", "RA", "Control", "RA", "Control", "RA", "RA", "Control", 
+  "Control", "RA", "RA", "Control", "RA", "Control", "RA"
+))
+groups_205962 <- factor(c(rep("RA", 16), rep("HC", 4)))
+extract_romo1 <- function(gse, groups) {
+  expr <- exprs(gse[[1]])
+  feature_data <- fData(gse[[1]])
+  
+  if ("Gene symbol" %in% colnames(feature_data)) {
+    col_name <- "Gene symbol"
+  } else if ("Gene Symbol" %in% colnames(feature_data)) {
+    col_name <- "Gene Symbol"
+  } else {
+    stop("Cannot find a column for gene symbols")
+  }
+  
+  romo1_probe <- grep("ROMO1", feature_data[[col_name]], ignore.case = TRUE)
+  
+  if (length(romo1_probe) == 0) {
+    stop("ROMO1 probe not found in the dataset")
+  }
+  
+  romo1_expr <- expr[romo1_probe[1], ]
+  batch <- rep(deparse(substitute(gse)), length(romo1_expr))
+  list(expr = romo1_expr, group = groups, batch = batch)
+}
+data56649 <- extract_romo1(gse56649, groups_56649)
+data15573 <- extract_romo1(gse15573, groups_15573)
+data205962 <- extract_romo1(gse205962, groups_205962)
+train_expr <- data56649$expr
+train_group <- data56649$group
+valid1_expr <- data15573$expr
+valid1_group <- data15573$group
+valid2_expr <- data205962$expr
+valid2_group <- data205962$group
+roc_train <- roc(train_group, train_expr)
+auc_train <- auc(roc_train)
+best_cutoff <- coords(roc_train, "best", ret = c("threshold", "specificity", "sensitivity"))
+roc_valid1 <- roc(valid1_group, valid1_expr)
+auc_valid1 <- auc(roc_valid1)
+roc_valid2 <- roc(valid2_group, valid2_expr)
+auc_valid2 <- auc(roc_valid2)
+plot(roc_train, main = "ROC Curves for ROMO1 in RA Diagnosis", col = "red")
+lines(roc_valid1, col = "blue")
+lines(roc_valid2, col = "green")
+legend("bottomright", legend = c("Training (GSE56649)", "Validation 1 (GSE15573)", "Validation 2 (GSE205962)"),
+       col = c("red", "blue", "green"), lwd = 2)
+cat("Training set (GSE56649):\n")
+cat("AUC:", auc_train, "\n")
+cat("Best cutoff:", as.numeric(best_cutoff$threshold), "\n")
+cat("Sensitivity:", as.numeric(best_cutoff$sensitivity), "\n")
+cat("Specificity:", as.numeric(best_cutoff$specificity), "\n\n")
+best_threshold <- as.numeric(best_cutoff$threshold)
+cat("Validation set 1 (GSE15573):\n")
+cat("AUC:", auc_valid1, "\n")
+cat("Sensitivity:", as.numeric(coords(roc_valid1, best_threshold, ret = "sensitivity")), "\n")
+cat("Specificity:", as.numeric(coords(roc_valid1, best_threshold, ret = "specificity")), "\n\n")
+cat("Validation set 2 (GSE205962):\n")
+cat("AUC:", auc_valid2, "\n")
+cat("Sensitivity:", as.numeric(coords(roc_valid2, best_threshold, ret = "sensitivity")), "\n")
+cat("Specificity:", as.numeric(coords(roc_valid2, best_threshold, ret = "specificity")), "\n")
+
+
+ci_train <- ci.auc(roc_train)
+ci_valid1 <- ci.auc(roc_valid1)
+ci_valid2 <- ci.auc(roc_valid2)
+
+plot_data <- rbind(
+  data.frame(specificity = roc_train$specificities, sensitivity = roc_train$sensitivities, group = "Training (GSE56649)"),
+  data.frame(specificity = roc_valid1$specificities, sensitivity = roc_valid1$sensitivities, group = "Validation 1 (GSE15573)"),
+  data.frame(specificity = roc_valid2$specificities, sensitivity = roc_valid2$sensitivities, group = "Validation 2 (GSE205962)")
+)
+
+p <- ggplot(plot_data, aes(x = 1 - specificity, y = sensitivity, color = group)) +
+  geom_line(size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73")) +
+  theme_minimal() +
+  labs(
+    title = "ROC Curves for ROMO1 in RA Diagnosis",
+    x = "1 - Specificity",
+    y = "Sensitivity",
+    color = "Dataset"
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(face = "bold")
+  )
+
+auc_text <- sprintf(
+  "Training AUC: %.3f (95%% CI: %.3f-%.3f)\nValidation 1 AUC: %.3f (95%% CI: %.3f-%.3f)\nValidation 2 AUC: %.3f (95%% CI: %.3f-%.3f)",
+  auc_train, ci_train[1], ci_train[3],
+  auc_valid1, ci_valid1[1], ci_valid1[3],
+  auc_valid2, ci_valid2[1], ci_valid2[3]
+)
+
+p <- p + annotate("text", x = 0.75, y = 0.25, label = auc_text, hjust = 0, vjust = 0, size = 3)
+
+print(p)
+
+
+gse21942 <- getGEO('GSE21942', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse108000 <- getGEO('GSE108000', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse17048 <- getGEO('GSE17048', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+
+
+groups_21942 <- factor(c(rep("HC", 15), rep("MS", 14)))
+groups_108000 <- factor(c(rep("HC", 10), rep("MS", 30)))
+groups_17048 <- factor(c(rep("HC", 45), rep("MS", 99)))
+
+extract_romo1 <- function(gse, groups) {
+  expr <- exprs(gse[[1]])
+  feature_data <- fData(gse[[1]])
+  
+
+  possible_columns <- c("Gene symbol", "Gene Symbol", "GENE_SYMBOL")
+  col_name <- intersect(possible_columns, colnames(feature_data))
+  
+  if (length(col_name) == 0) {
+    stop("Cannot find a column for gene symbols. Available columns are: ", 
+         paste(colnames(feature_data), collapse = ", "))
+  }
+  
+  romo1_probe <- grep("ROMO1", feature_data[[col_name]], ignore.case = TRUE)
+  
+  if (length(romo1_probe) == 0) {
+    stop("ROMO1 probe not found in the dataset")
+  }
+  
+  romo1_expr <- expr[romo1_probe[1], ]
+  batch <- rep(deparse(substitute(gse)), length(romo1_expr))
+  list(expr = romo1_expr, group = groups, batch = batch)
+}
+
+data21942 <- extract_romo1(gse21942, groups_21942)
+data108000 <- extract_romo1(gse108000, groups_108000)
+data17048 <- extract_romo1(gse17048, groups_17048)
+train_expr <- data21942$expr
+train_group <- data21942$group
+valid1_expr <- data108000$expr
+valid1_group <- data108000$group
+valid2_expr <- data17048$expr
+valid2_group <- data17048$group
+roc_train <- roc(train_group, train_expr)
+auc_train <- auc(roc_train)
+best_cutoff <- coords(roc_train, "best", ret = c("threshold", "specificity", "sensitivity"))
+roc_valid1 <- roc(valid1_group, valid1_expr)
+auc_valid1 <- auc(roc_valid1)
+roc_valid2 <- roc(valid2_group, valid2_expr)
+auc_valid2 <- auc(roc_valid2)
+plot(roc_train, main = "ROC Curves for ROMO1 in MS Diagnosis", col = "red")
+lines(roc_valid1, col = "blue")
+lines(roc_valid2, col = "green")
+legend("bottomright", legend = c("Training (GSE21942)", "Validation 1 (GSE108000)", "Validation 2 (GSE17048)"),
+       col = c("red", "blue", "green"), lwd = 2)
+cat("Training set (GSE21942):\n")
+cat("AUC:", auc_train, "\n")
+cat("Best cutoff:", as.numeric(best_cutoff$threshold), "\n")
+cat("Sensitivity:", as.numeric(best_cutoff$sensitivity), "\n")
+cat("Specificity:", as.numeric(best_cutoff$specificity), "\n\n")
+best_threshold <- as.numeric(best_cutoff$threshold)
+cat("Validation set 1 (GSE108000):\n")
+cat("AUC:", auc_valid1, "\n")
+cat("Sensitivity:", as.numeric(coords(roc_valid1, best_threshold, ret = "sensitivity")), "\n")
+cat("Specificity:", as.numeric(coords(roc_valid1, best_threshold, ret = "specificity")), "\n\n")
+cat("Validation set 2 (GSE17048):\n")
+cat("AUC:", auc_valid2, "\n")
+cat("Sensitivity:", as.numeric(coords(roc_valid2, best_threshold, ret = "sensitivity")), "\n")
+cat("Specificity:", as.numeric(coords(roc_valid2, best_threshold, ret = "specificity")), "\n")
+library(ggplot2)
+library(pROC)
+library(gridExtra)
+ci_train <- ci.auc(roc_train)
+ci_valid1 <- ci.auc(roc_valid1)
+ci_valid2 <- ci.auc(roc_valid2)
+plot_data <- rbind(
+  data.frame(specificity = roc_train$specificities, sensitivity = roc_train$sensitivities, group = "Training (GSE21942)"),
+  data.frame(specificity = roc_valid1$specificities, sensitivity = roc_valid1$sensitivities, group = "Validation 1 (GSE108000)"),
+  data.frame(specificity = roc_valid2$specificities, sensitivity = roc_valid2$sensitivities, group = "Validation 2 (GSE17048)")
+)
+
+p <- ggplot(plot_data, aes(x = 1 - specificity, y = sensitivity, color = group)) +
+  geom_line(size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73")) +
+  theme_minimal() +
+  labs(
+    title = "ROC Curves for ROMO1 in MS Diagnosis",
+    x = "1 - Specificity",
+    y = "Sensitivity",
+    color = "Dataset"
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(face = "bold")
+  )
+
+auc_text <- sprintf(
+  "Training AUC: %.3f (95%% CI: %.3f-%.3f)\nValidation 1 AUC: %.3f (95%% CI: %.3f-%.3f)\nValidation 2 AUC: %.3f (95%% CI: %.3f-%.3f)",
+  auc_train, ci_train[1], ci_train[3],
+  auc_valid1, ci_valid1[1], ci_valid1[3],
+  auc_valid2, ci_valid2[1], ci_valid2[3]
+)
+
+p <- p + annotate("text", x = 0.75, y = 0.25, label = auc_text, hjust = 0, vjust = 0, size = 3)
+
+print(p)
+
+gse44314 <- getGEO('GSE44314', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse193273 <- getGEO('GSE193273', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse33440 <- getGEO('GSE33440', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+
+groups_44314 <- factor(c(rep("T1D", 10), rep("HC", 6)))
+groups_193273 <- factor(c(rep("HC", 20), rep("T1D", 20)))
+groups_33440 <- factor(c(rep("HC", 2), rep("T1D", 8), rep("HC", 4), rep("T1D", 8)))
+extract_romo1 <- function(gse, groups) {
+  expr <- exprs(gse[[1]])
+  feature_data <- fData(gse[[1]])
+  
+  possible_columns <- c("Gene symbol", "Gene Symbol", "GENE_SYMBOL")
+  col_name <- intersect(possible_columns, colnames(feature_data))
+  
+  if (length(col_name) == 0) {
+    stop("Cannot find a column for gene symbols. Available columns are: ", 
+         paste(colnames(feature_data), collapse = ", "))
+  }
+  
+  romo1_probe <- grep("ROMO1", feature_data[[col_name]], ignore.case = TRUE)
+  
+  if (length(romo1_probe) == 0) {
+    stop("ROMO1 probe not found in the dataset")
+  }
+  
+  romo1_expr <- expr[romo1_probe[1], ]
+  batch <- rep(deparse(substitute(gse)), length(romo1_expr))
+  list(expr = romo1_expr, group = groups, batch = batch)
+}
+
+data44314 <- extract_romo1(gse44314, groups_44314)
+data193273 <- extract_romo1(gse193273, groups_193273)
+data33440 <- extract_romo1(gse33440, groups_33440)
+train_expr <- data44314$expr
+train_group <- data44314$group
+valid1_expr <- data193273$expr
+valid1_group <- data193273$group
+valid2_expr <- data33440$expr
+valid2_group <- data33440$group
+roc_train <- roc(train_group, train_expr)
+auc_train <- auc(roc_train)
+best_cutoff <- coords(roc_train, "best", ret = c("threshold", "specificity", "sensitivity"))
+roc_valid1 <- roc(valid1_group, valid1_expr)
+auc_valid1 <- auc(roc_valid1)
+roc_valid2 <- roc(valid2_group, valid2_expr)
+auc_valid2 <- auc(roc_valid2)
+
+plot(roc_train, main = "ROC Curves for ROMO1 in T1D Diagnosis", col = "red")
+lines(roc_valid1, col = "blue")
+lines(roc_valid2, col = "green")
+legend("bottomright", legend = c("Training (GSE44314)", "Validation 1 (GSE193273)", "Validation 2 (GSE33440)"),
+       col = c("red", "blue", "green"), lwd = 2)
+
+cat("Training set (GSE44314):\n")
+cat("AUC:", auc_train, "\n")
+cat("Best cutoff:", as.numeric(best_cutoff$threshold), "\n")
+cat("Sensitivity:", as.numeric(best_cutoff$sensitivity), "\n")
+cat("Specificity:", as.numeric(best_cutoff$specificity), "\n\n")
+
+best_threshold <- as.numeric(best_cutoff$threshold)
+
+cat("Validation set 1 (GSE193273):\n")
+cat("AUC:", auc_valid1, "\n")
+cat("Sensitivity:", as.numeric(coords(roc_valid1, best_threshold, ret = "sensitivity")), "\n")
+cat("Specificity:", as.numeric(coords(roc_valid1, best_threshold, ret = "specificity")), "\n\n")
+
+cat("Validation set 2 (GSE33440):\n")
+cat("AUC:", auc_valid2, "\n")
+cat("Sensitivity:", as.numeric(coords(roc_valid2, best_threshold, ret = "sensitivity")), "\n")
+cat("Specificity:", as.numeric(coords(roc_valid2, best_threshold, ret = "specificity")), "\n")
+
+ci_train <- ci.auc(roc_train)
+ci_valid1 <- ci.auc(roc_valid1)
+ci_valid2 <- ci.auc(roc_valid2)
+
+plot_data <- rbind(
+  data.frame(specificity = roc_train$specificities, sensitivity = roc_train$sensitivities, group = "Training (GSE44314)"),
+  data.frame(specificity = roc_valid1$specificities, sensitivity = roc_valid1$sensitivities, group = "Validation 1 (GSE193273)"),
+  data.frame(specificity = roc_valid2$specificities, sensitivity = roc_valid2$sensitivities, group = "Validation 2 (GSE33440)")
+)
+
+p <- ggplot(plot_data, aes(x = 1 - specificity, y = sensitivity, color = group)) +
+  geom_line(size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73")) +
+  theme_minimal() +
+  labs(
+    title = "ROC Curves for ROMO1 in T1D Diagnosis",
+    x = "1 - Specificity",
+    y = "Sensitivity",
+    color = "Dataset"
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(face = "bold")
+  )
+
+auc_text <- sprintf(
+  "Training AUC: %.3f (95%% CI: %.3f-%.3f)\nValidation 1 AUC: %.3f (95%% CI: %.3f-%.3f)\nValidation 2 AUC: %.3f (95%% CI: %.3f-%.3f)",
+  auc_train, ci_train[1], ci_train[3],
+  auc_valid1, ci_valid1[1], ci_valid1[3],
+  auc_valid2, ci_valid2[1], ci_valid2[3]
+)
+
+p <- p + annotate("text", x = 0.75, y = 0.25, label = auc_text, hjust = 0, vjust = 0, size = 3)
+
+print(p)

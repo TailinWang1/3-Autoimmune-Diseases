@@ -1,0 +1,659 @@
+library(pleio)
+library(readxl)
+library(dplyr)
+library(ieugwasr)
+library(TwoSampleMR)
+library(plinkbinr)
+#1
+a <- extract_instruments(outcomes = "ebi-a-GCST90028998", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90028998.csv")
+write.csv(res,"ebi-a-GCST90028998-res.csv")
+pleio<- mr_pleiotropy_test(dat)
+het<- mr_heterogeneity(dat)
+OR <-generate_odds_ratios(res)
+#2
+a <- extract_instruments(outcomes = "ebi-a-GCST90002008", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002008.csv")
+write.csv(res,"ebi-a-GCST90002008-res.csv")
+#3
+a <- extract_instruments(outcomes = "ebi-a-GCST90002004", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002004.csv")
+write.csv(res,"ebi-a-GCST90002004-res.csv")
+#4,只有1个snp，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90001982", 
+                         p1 = 5e-6,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 100,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001982.csv")
+
+#5，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90001992", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001992.csv")
+
+#6
+a <- extract_instruments(outcomes = "ebi-a-GCST90002089", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002089.csv")
+write.csv(res,"ebi-a-GCST90002089-res.csv")
+#7，只有1个SNP，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90001986", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001986.csv")
+
+#8，只有1个SNP，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90001983", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001983.csv")
+
+#9
+a <- extract_instruments(outcomes = "ebi-a-GCST90002005", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002005.csv")
+write.csv(res,"ebi-a-GCST90002005-res.csv")
+#10，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90001979", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001979.csv")
+#11。2个SNP不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90002034", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002034.csv")
+#12
+a <- extract_instruments(outcomes = "ebi-a-GCST90001985", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001985.csv")
+write.csv(res,"ebi-a-GCST90001985-res.csv")
+#13
+a <- extract_instruments(outcomes = "ebi-a-GCST90001980", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001980.csv")
+write.csv(res,"ebi-a-GCST90001980-res.csv")
+#14
+a <- extract_instruments(outcomes = "ebi-a-GCST90001989", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001989.csv")
+write.csv(res,"ebi-a-GCST90001989-res.csv")
+#15
+a <- extract_instruments(outcomes = "ebi-a-GCST90001981", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001981.csv")
+write.csv(res,"ebi-a-GCST90001981-res.csv")
+#16
+a <- extract_instruments(outcomes = "ebi-a-GCST90002006", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002006.csv")
+write.csv(res,"ebi-a-GCST90002006-res.csv")
+#17
+a <- extract_instruments(outcomes = "ebi-a-GCST90001987", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001987.csv")
+write.csv(res,"ebi-a-GCST90001987-res.csv")
+#18，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90001990", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001990.csv")
+#19，1个snp，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90002011", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002011.csv")
+#20，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90002039", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002039.csv")
+#21，1个SNP不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90001905", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001905.csv")
+#22，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90001967", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001967.csv")
+#23
+a <- extract_instruments(outcomes = "ebi-a-GCST90002010", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002010.csv")
+write.csv(res,"ebi-a-GCST90002010-res.csv")
+#24
+a <- extract_instruments(outcomes = "ebi-a-GCST90001988", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001988.csv")
+write.csv(res,"ebi-a-GCST90001988-res.csv")
+#25
+a <- extract_instruments(outcomes = "ebi-a-GCST90002007", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002007.csv")
+write.csv(res,"ebi-a-GCST90002007-res.csv")
+#26，2个snp
+a <- extract_instruments(outcomes = "ebi-a-GCST90002002", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002002.csv")
+#27，1个snp
+a <- extract_instruments(outcomes = "ebi-a-GCST90001993", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001993.csv")
+#28
+a <- extract_instruments(outcomes = "ebi-a-GCST90001999", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001999.csv")
+write.csv(res,"ebi-a-GCST90001999-res.csv")
+#29，1个snp，不行
+a <- extract_instruments(outcomes = "ebi-a-GCST90001998", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90001998.csv")
+#30
+a <- extract_instruments(outcomes = "ebi-a-GCST90002074", 
+                         p1 = 5e-8,  # 更宽松的显著性阈值
+                         clump = FALSE)
+head(a)
+#补充ld_clump需要的三列
+a$id<-a$id.exposure # id列用于区分是单个或多个来源的gwas数据，clump按照单个gwas数据进行
+a$rsid<-a$SNP
+a$pval<-a$pval.exposure
+b<- ieugwasr::ld_clump_local(
+  dat=a,
+  clump_kb = 10000,
+  clump_r2 = 0.01, 
+  clump_p = 1,
+  plink_bin="C:/Users/tailinwang/Documents/plink_win64_20241022/plink.exe",
+  bfile ="C:/Users/tailinwang/Documents/g1000_eur/g1000_eur")
+c<-subset(a,SNP%in%b$rsid)
+outcome_dat <- extract_outcome_data(snps = c$SNP, outcomes = 'eqtl-a-ENSG00000125995')
+dat<- harmonise_data(exposure_dat =c,  outcome_dat = outcome_dat)
+res<- mr(dat)
+write.csv(dat,"ebi-a-GCST90002074.csv")
+write.csv(res,"ebi-a-GCST90002074-res.csv")

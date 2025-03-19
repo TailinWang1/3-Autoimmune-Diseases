@@ -1,0 +1,398 @@
+library(GEOquery)
+library(pROC)
+library(ggplot2)
+
+# 下载并处理GSE数据集
+gse56649 <- getGEO('GSE56649', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse15573 <- getGEO('GSE15573', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse205962 <- getGEO('GSE205962', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+
+# 定义样本分组
+groups_56649 <- factor(c(rep("RA", 13), rep("HC", 9)))
+groups_15573 <- factor(c("RA", "RA", "Control", "RA", "Control", "RA", "Control", "Control", "RA", "Control", "Control", "RA", "Control", "RA", "RA", "Control", "RA", "Control", "RA", "RA", "Control", "RA", "Control", "RA", "RA", "Control", "Control", "RA", "RA", "Control", "RA", "Control", "RA"))
+groups_205962 <- factor(c(rep("RA", 16), rep("HC", 4)))
+
+# 提取基因表达数据
+extract_gene_expr <- function(gse, groups, gene_symbol) {
+  expr <- exprs(gse[[1]])
+  feature_data <- fData(gse[[1]])
+  
+  if ("Gene symbol" %in% colnames(feature_data)) {
+    col_name <- "Gene symbol"
+  } else if ("Gene Symbol" %in% colnames(feature_data)) {
+    col_name <- "Gene Symbol"
+  } else {
+    stop("Cannot find a column for gene symbols")
+  }
+  
+  gene_probe <- grep(gene_symbol, feature_data[[col_name]], ignore.case = TRUE)
+  if (length(gene_probe) == 0) {
+    stop(paste(gene_symbol, "probe not found in the dataset"))
+  }
+  
+  gene_expr <- expr[gene_probe[1], ]
+  batch <- rep(deparse(substitute(gse)), length(gene_expr))
+  list(expr = gene_expr, group = groups, batch = batch)
+}
+
+# 提取ROMO1、CRP和ADA的表达数据
+data56649_romo1 <- extract_gene_expr(gse56649, groups_56649, "ROMO1")
+data15573_romo1 <- extract_gene_expr(gse15573, groups_15573, "ROMO1")
+data205962_romo1 <- extract_gene_expr(gse205962, groups_205962, "ROMO1")
+
+data56649_crp <- extract_gene_expr(gse56649, groups_56649, "CRP")
+data15573_crp <- extract_gene_expr(gse15573, groups_15573, "CRP")
+data205962_crp <- extract_gene_expr(gse205962, groups_205962, "CRP")
+
+data56649_ada <- extract_gene_expr(gse56649, groups_56649, "ADA")
+data15573_ada <- extract_gene_expr(gse15573, groups_15573, "ADA")
+data205962_ada <- extract_gene_expr(gse205962, groups_205962, "ADA")
+
+# 计算ROC曲线和AUC
+calc_roc <- function(expr, group) {
+  roc_curve <- roc(group, expr)
+  auc_value <- auc(roc_curve)
+  list(roc = roc_curve, auc = auc_value)
+}
+
+# ROMO1
+roc_train_romo1 <- calc_roc(data56649_romo1$expr, data56649_romo1$group)
+roc_valid1_romo1 <- calc_roc(data15573_romo1$expr, data15573_romo1$group)
+roc_valid2_romo1 <- calc_roc(data205962_romo1$expr, data205962_romo1$group)
+
+# CRP
+roc_train_crp <- calc_roc(data56649_crp$expr, data56649_crp$group)
+roc_valid1_crp <- calc_roc(data15573_crp$expr, data15573_crp$group)
+roc_valid2_crp <- calc_roc(data205962_crp$expr, data205962_crp$group)
+
+# ADA
+roc_train_ada <- calc_roc(data56649_ada$expr, data56649_ada$group)
+roc_valid1_ada <- calc_roc(data15573_ada$expr, data15573_ada$group)
+roc_valid2_ada <- calc_roc(data205962_ada$expr, data205962_ada$group)
+
+# 整合数据用于绘图
+plot_data <- rbind(
+  data.frame(specificity = roc_train_romo1$roc$specificities, sensitivity = roc_train_romo1$roc$sensitivities, group = "ROMO1 (Training)"),
+  data.frame(specificity = roc_valid1_romo1$roc$specificities, sensitivity = roc_valid1_romo1$roc$sensitivities, group = "ROMO1 (Validation 1)"),
+  data.frame(specificity = roc_valid2_romo1$roc$specificities, sensitivity = roc_valid2_romo1$roc$sensitivities, group = "ROMO1 (Validation 2)"),
+  data.frame(specificity = roc_train_crp$roc$specificities, sensitivity = roc_train_crp$roc$sensitivities, group = "CRP (Training)"),
+  data.frame(specificity = roc_valid1_crp$roc$specificities, sensitivity = roc_valid1_crp$roc$sensitivities, group = "CRP (Validation 1)"),
+  data.frame(specificity = roc_valid2_crp$roc$specificities, sensitivity = roc_valid2_crp$roc$sensitivities, group = "CRP (Validation 2)"),
+  data.frame(specificity = roc_train_ada$roc$specificities, sensitivity = roc_train_ada$roc$sensitivities, group = "ADA (Training)"),
+  data.frame(specificity = roc_valid1_ada$roc$specificities, sensitivity = roc_valid1_ada$roc$sensitivities, group = "ADA (Validation 1)"),
+  data.frame(specificity = roc_valid2_ada$roc$specificities, sensitivity = roc_valid2_ada$roc$sensitivities, group = "ADA (Validation 2)")
+)
+
+# 绘制ROC曲线
+p <- ggplot(plot_data, aes(x = 1 - specificity, y = sensitivity, color = group)) +
+  geom_line(size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#999999", "#000000")) +
+  theme_minimal() +
+  labs(
+    title = "ROC Curves for ROMO1, CRP, and ADA in RA Diagnosis",
+    x = "1 - Specificity",
+    y = "Sensitivity",
+    color = "Dataset"
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(face = "bold")
+  )
+
+# 添加AUC信息
+auc_text <- sprintf(
+  "ROMO1 Training AUC: %.3f\nROMO1 Validation 1 AUC: %.3f\nROMO1 Validation 2 AUC: %.3f\nCRP Training AUC: %.3f\nCRP Validation 1 AUC: %.3f\nCRP Validation 2 AUC: %.3f\nADA Training AUC: %.3f\nADA Validation 1 AUC: %.3f\nADA Validation 2 AUC: %.3f",
+  roc_train_romo1$auc, roc_valid1_romo1$auc, roc_valid2_romo1$auc,
+  roc_train_crp$auc, roc_valid1_crp$auc, roc_valid2_crp$auc,
+  roc_train_ada$auc, roc_valid1_ada$auc, roc_valid2_ada$auc
+)
+
+p <- p + annotate("text", x = 0.75, y = 0.25, label = auc_text, hjust = 0, vjust = 0, size = 3)
+
+print(p)
+
+# 获取GEO数据集
+gse21942 <- getGEO('GSE21942', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse108000 <- getGEO('GSE108000', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse17048 <- getGEO('GSE17048', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+
+# 定义分组
+groups_21942 <- factor(c(rep("HC", 15), rep("MS", 14)))
+groups_108000 <- factor(c(rep("HC", 10), rep("MS", 30)))
+groups_17048 <- factor(c(rep("HC", 45), rep("MS", 99)))
+
+# 提取基因表达数据的函数
+extract_gene_expr <- function(gse, groups, gene_symbol) {
+  expr <- exprs(gse[[1]])
+  feature_data <- fData(gse[[1]])
+  
+  possible_columns <- c("Gene symbol", "Gene Symbol", "GENE_SYMBOL")
+  col_name <- intersect(possible_columns, colnames(feature_data))
+  
+  if (length(col_name) == 0) {
+    stop("Cannot find a column for gene symbols. Available columns are: ", 
+         paste(colnames(feature_data), collapse = ", "))
+  }
+  
+  gene_probe <- grep(gene_symbol, feature_data[[col_name]], ignore.case = TRUE)
+  
+  if (length(gene_probe) == 0) {
+    stop(paste(gene_symbol, "probe not found in the dataset"))
+  }
+  
+  gene_expr <- expr[gene_probe[1], ]
+  batch <- rep(deparse(substitute(gse)), length(gene_expr))
+  list(expr = gene_expr, group = groups, batch = batch)
+}
+# 提取ROMO1、CXCL13和CXCL5的表达数据
+data21942_romo1 <- extract_gene_expr(gse21942, groups_21942, "ROMO1")
+data108000_romo1 <- extract_gene_expr(gse108000, groups_108000, "ROMO1")
+data17048_romo1 <- extract_gene_expr(gse17048, groups_17048, "ROMO1")
+
+data21942_cxcl13 <- extract_gene_expr(gse21942, groups_21942, "CXCL13")
+data108000_cxcl13 <- extract_gene_expr(gse108000, groups_108000, "CXCL13")
+data17048_cxcl13 <- extract_gene_expr(gse17048, groups_17048, "CXCL13")
+
+data21942_cxcl5 <- extract_gene_expr(gse21942, groups_21942, "CXCL5")
+data108000_cxcl5 <- extract_gene_expr(gse108000, groups_108000, "CXCL5")
+data17048_cxcl5 <- extract_gene_expr(gse17048, groups_17048, "CXCL5")
+
+# 计算ROC曲线和AUC
+calc_roc <- function(expr, group) {
+  roc_curve <- roc(group, expr)
+  auc_value <- auc(roc_curve)
+  list(roc = roc_curve, auc = auc_value)
+}
+
+# ROMO1
+roc_train_romo1 <- calc_roc(data21942_romo1$expr, data21942_romo1$group)
+roc_valid1_romo1 <- calc_roc(data108000_romo1$expr, data108000_romo1$group)
+roc_valid2_romo1 <- calc_roc(data17048_romo1$expr, data17048_romo1$group)
+
+# CXCL13
+roc_train_cxcl13 <- calc_roc(data21942_cxcl13$expr, data21942_cxcl13$group)
+roc_valid1_cxcl13 <- calc_roc(data108000_cxcl13$expr, data108000_cxcl13$group)
+roc_valid2_cxcl13 <- calc_roc(data17048_cxcl13$expr, data17048_cxcl13$group)
+
+# CXCL5
+roc_train_cxcl5 <- calc_roc(data21942_cxcl5$expr, data21942_cxcl5$group)
+roc_valid1_cxcl5 <- calc_roc(data108000_cxcl5$expr, data108000_cxcl5$group)
+roc_valid2_cxcl5 <- calc_roc(data17048_cxcl5$expr, data17048_cxcl5$group)
+
+# 整合数据用于绘图
+plot_data <- rbind(
+  data.frame(specificity = roc_train_romo1$roc$specificities, sensitivity = roc_train_romo1$roc$sensitivities, group = "ROMO1 (Training)"),
+  data.frame(specificity = roc_valid1_romo1$roc$specificities, sensitivity = roc_valid1_romo1$roc$sensitivities, group = "ROMO1 (Validation 1)"),
+  data.frame(specificity = roc_valid2_romo1$roc$specificities, sensitivity = roc_valid2_romo1$roc$sensitivities, group = "ROMO1 (Validation 2)"),
+  data.frame(specificity = roc_train_cxcl13$roc$specificities, sensitivity = roc_train_cxcl13$roc$sensitivities, group = "CXCL13 (Training)"),
+  data.frame(specificity = roc_valid1_cxcl13$roc$specificities, sensitivity = roc_valid1_cxcl13$roc$sensitivities, group = "CXCL13 (Validation 1)"),
+  data.frame(specificity = roc_valid2_cxcl13$roc$specificities, sensitivity = roc_valid2_cxcl13$roc$sensitivities, group = "CXCL13 (Validation 2)"),
+  data.frame(specificity = roc_train_cxcl5$roc$specificities, sensitivity = roc_train_cxcl5$roc$sensitivities, group = "CXCL5 (Training)"),
+  data.frame(specificity = roc_valid1_cxcl5$roc$specificities, sensitivity = roc_valid1_cxcl5$roc$sensitivities, group = "CXCL5 (Validation 1)"),
+  data.frame(specificity = roc_valid2_cxcl5$roc$specificities, sensitivity = roc_valid2_cxcl5$roc$sensitivities, group = "CXCL5 (Validation 2)")
+)
+
+# 绘制ROC曲线
+p <- ggplot(plot_data, aes(x = 1 - specificity, y = sensitivity, color = group)) +
+  geom_line(size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#999999", "#000000")) +
+  theme_minimal() +
+  labs(
+    title = "ROC Curves for ROMO1, CXCL13, and CXCL5 in MS Diagnosis",
+    x = "1 - Specificity",
+    y = "Sensitivity",
+    color = "Dataset"
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(face = "bold")
+  )
+
+# 添加AUC信息
+auc_text <- sprintf(
+  "ROMO1 Training AUC: %.3f\nROMO1 Validation 1 AUC: %.3f\nROMO1 Validation 2 AUC: %.3f\nCXCL13 Training AUC: %.3f\nCXCL13 Validation 1 AUC: %.3f\nCXCL13 Validation 2 AUC: %.3f\nCXCL5 Training AUC: %.3f\nCXCL5 Validation 1 AUC: %.3f\nCXCL5 Validation 2 AUC: %.3f",
+  roc_train_romo1$auc, roc_valid1_romo1$auc, roc_valid2_romo1$auc,
+  roc_train_cxcl13$auc, roc_valid1_cxcl13$auc, roc_valid2_cxcl13$auc,
+  roc_train_cxcl5$auc, roc_valid1_cxcl5$auc, roc_valid2_cxcl5$auc
+)
+
+p <- p + annotate("text", x = 0.75, y = 0.25, label = auc_text, hjust = 0, vjust = 0, size = 3)
+
+print(p)
+
+
+# 提取ROMO1、CXCL13和CXCL5的表达数据
+genes <- c("ROMO1", "CXCL13", "CXCL5")
+roc_data <- lapply(genes, function(gene) {
+  data21942 <- extract_gene_expr(gse21942, groups_21942, gene)
+  data108000 <- extract_gene_expr(gse108000, groups_108000, gene)
+  data17048 <- extract_gene_expr(gse17048, groups_17048, gene)
+  
+  roc_train <- roc(data21942$group, data21942$expr)
+  roc_valid1 <- roc(data108000$group, data108000$expr)
+  roc_valid2 <- roc(data17048$group, data17048$expr)
+  
+  list(train = roc_train, valid1 = roc_valid1, valid2 = roc_valid2, gene = gene)
+})
+
+# 整合数据用于绘图
+plot_data <- rbind(
+  data.frame(specificity = roc_train_romo1$roc$specificities, sensitivity = roc_train_romo1$roc$sensitivities, group = "ROMO1 (Training)"),
+  data.frame(specificity = roc_valid1_romo1$roc$specificities, sensitivity = roc_valid1_romo1$roc$sensitivities, group = "ROMO1 (Validation 1)"),
+  data.frame(specificity = roc_valid2_romo1$roc$specificities, sensitivity = roc_valid2_romo1$roc$sensitivities, group = "ROMO1 (Validation 2)"),
+  data.frame(specificity = roc_train_crp$roc$specificities, sensitivity = roc_train_crp$roc$sensitivities, group = "CRP (Training)"),
+  data.frame(specificity = roc_valid1_crp$roc$specificities, sensitivity = roc_valid1_crp$roc$sensitivities, group = "CRP (Validation 1)"),
+  data.frame(specificity = roc_valid2_crp$roc$specificities, sensitivity = roc_valid2_crp$roc$sensitivities, group = "CRP (Validation 2)"),
+  data.frame(specificity = roc_train_ada$roc$specificities, sensitivity = roc_train_ada$roc$sensitivities, group = "ADA (Training)"),
+  data.frame(specificity = roc_valid1_ada$roc$specificities, sensitivity = roc_valid1_ada$roc$sensitivities, group = "ADA (Validation 1)"),
+  data.frame(specificity = roc_valid2_ada$roc$specificities, sensitivity = roc_valid2_ada$roc$sensitivities, group = "ADA (Validation 2)")
+)
+
+# 绘制ROC曲线
+p <- ggplot(plot_data, aes(x = 1 - specificity, y = sensitivity, color = group)) +
+  geom_line(size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#999999", "#000000")) +
+  theme_minimal() +
+  labs(
+    title = "ROC Curves for ROMO1, CRP, and ADA in RA Diagnosis",
+    x = "1 - Specificity",
+    y = "Sensitivity",
+    color = "Dataset"
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(face = "bold")
+  )
+
+# 添加AUC信息
+auc_text <- sprintf(
+  "ROMO1 Training AUC: %.3f\nROMO1 Validation 1 AUC: %.3f\nROMO1 Validation 2 AUC: %.3f\nCRP Training AUC: %.3f\nCRP Validation 1 AUC: %.3f\nCRP Validation 2 AUC: %.3f\nADA Training AUC: %.3f\nADA Validation 1 AUC: %.3f\nADA Validation 2 AUC: %.3f",
+  roc_train_romo1$auc, roc_valid1_romo1$auc, roc_valid2_romo1$auc,
+  roc_train_crp$auc, roc_valid1_crp$auc, roc_valid2_crp$auc,
+  roc_train_ada$auc, roc_valid1_ada$auc, roc_valid2_ada$auc
+)
+
+p <- p + annotate("text", x = 0.75, y = 0.25, label = auc_text, hjust = 0, vjust = 0, size = 3)
+
+print(p)
+# 获取GEO数据集
+gse44314 <- getGEO('GSE44314', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse193273 <- getGEO('GSE193273', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+gse33440 <- getGEO('GSE33440', destdir=".", AnnotGPL = TRUE, getGPL = TRUE)
+
+# 定义分组
+groups_44314 <- factor(c(rep("T1D", 10), rep("HC", 6)))
+groups_193273 <- factor(c(rep("HC", 20), rep("T1D", 20)))
+groups_33440 <- factor(c(rep("HC", 2), rep("T1D", 8), rep("HC", 4), rep("T1D", 8)))
+
+# 提取基因表达数据的函数
+extract_gene_expr <- function(gse, groups, gene_symbol) {
+  expr <- exprs(gse[[1]])
+  feature_data <- fData(gse[[1]])
+  
+  possible_columns <- c("Gene symbol", "Gene Symbol", "GENE_SYMBOL")
+  col_name <- intersect(possible_columns, colnames(feature_data))
+  
+  if (length(col_name) == 0) {
+    stop("Cannot find a column for gene symbols. Available columns are: ", 
+         paste(colnames(feature_data), collapse = ", "))
+  }
+  
+  gene_probe <- grep(gene_symbol, feature_data[[col_name]], ignore.case = TRUE)
+  
+  if (length(gene_probe) == 0) {
+    stop(paste(gene_symbol, "probe not found in the dataset"))
+  }
+  
+  gene_expr <- expr[gene_probe[1], ]
+  batch <- rep(deparse(substitute(gse)), length(gene_expr))
+  list(expr = gene_expr, group = groups, batch = batch)
+}
+# 提取ROMO1、CXCL13和CXCL5的表达数据
+data44314_romo1 <- extract_gene_expr(gse44314, groups_44314, "ROMO1")
+data193273_romo1 <- extract_gene_expr(gse193273, groups_193273, "ROMO1")
+data33440_romo1 <- extract_gene_expr(gse33440, groups_33440, "ROMO1")
+
+data44314_tyk2<- extract_gene_expr(gse44314, groups_44314, "TYK2")
+data193273_tyk2 <- extract_gene_expr(gse193273, groups_193273, "TYK2")
+data33440_tyk2 <- extract_gene_expr(gse33440, groups_33440, "TYK2")
+
+data44314_tcl1a<- extract_gene_expr(gse44314, groups_44314, "TCL1A")
+data193273_tcl1a <- extract_gene_expr(gse193273, groups_193273, "TCL1A")
+data33440_tcl1a <- extract_gene_expr(gse33440, groups_33440, "TCL1A")
+
+# 计算ROC曲线和AUC
+calc_roc <- function(expr, group) {
+  roc_curve <- roc(group, expr)
+  auc_value <- auc(roc_curve)
+  list(roc = roc_curve, auc = auc_value)
+}
+
+# ROMO1
+roc_train_romo1 <- calc_roc(data44314_romo1$expr, data44314_romo1$group)
+roc_valid1_romo1 <- calc_roc(data193273_romo1$expr, data193273_romo1$group)
+roc_valid2_romo1 <- calc_roc(data33440_romo1$expr, data33440_romo1$group)
+
+# TYK2
+roc_train_tyk2 <- calc_roc(data44314_tyk2$expr, data44314_tyk2$group)
+roc_valid1_tyk2 <- calc_roc(data193273_tyk2$expr, data193273_tyk2$group)
+roc_valid2_tyk2 <- calc_roc(data33440_tyk2$expr, data33440_tyk2$group)
+
+# TCL1A
+roc_train_tcl1a <- calc_roc(data44314_tcl1a$expr, data44314_tcl1a$group)
+roc_valid1_tcl1a <- calc_roc(data193273_tcl1a$expr, data193273_tcl1a$group)
+roc_valid2_tcl1a <- calc_roc(data33440_tcl1a$expr, data33440_tcl1a$group)
+
+# 整合数据用于绘图
+plot_data <- rbind(
+  data.frame(specificity = roc_train_romo1$roc$specificities, sensitivity = roc_train_romo1$roc$sensitivities, group = "ROMO1 (Training)"),
+  data.frame(specificity = roc_valid1_romo1$roc$specificities, sensitivity = roc_valid1_romo1$roc$sensitivities, group = "ROMO1 (Validation 1)"),
+  data.frame(specificity = roc_valid2_romo1$roc$specificities, sensitivity = roc_valid2_romo1$roc$sensitivities, group = "ROMO1 (Validation 2)"),
+  data.frame(specificity = roc_train_tyk2$roc$specificities, sensitivity = roc_train_tyk2$roc$sensitivities, group = "TYK2 (Training)"),
+  data.frame(specificity = roc_valid1_tyk2$roc$specificities, sensitivity = roc_valid1_tyk2$roc$sensitivities, group = "TYK2 (Validation 1)"),
+  data.frame(specificity = roc_valid2_tyk2$roc$specificities, sensitivity = roc_valid2_tyk2$roc$sensitivities, group = "TYK2 (Validation 2)"),
+  data.frame(specificity = roc_train_tcl1a$roc$specificities, sensitivity = roc_train_tcl1a$roc$sensitivities, group = "TCL1A (Training)"),
+  data.frame(specificity = roc_valid1_tcl1a$roc$specificities, sensitivity = roc_valid1_tcl1a$roc$sensitivities, group = "TCL1A (Validation 1)"),
+  data.frame(specificity = roc_valid2_tcl1a$roc$specificities, sensitivity = roc_valid2_tcl1a$roc$sensitivities, group = "TCL1A (Validation 2)")
+)
+
+# 绘制ROC曲线
+p <- ggplot(plot_data, aes(x = 1 - specificity, y = sensitivity, color = group)) +
+  geom_line(size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#999999", "#000000")) +
+  theme_minimal() +
+  labs(
+    title = "ROC Curves for ROMO1, TYK2, and TCL1A in T1D Diagnosis",
+    x = "1 - Specificity",
+    y = "Sensitivity",
+    color = "Dataset"
+  ) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(face = "bold")
+  )
+
+# 添加AUC信息
+auc_text <- sprintf(
+  "ROMO1 Training AUC: %.3f\nROMO1 Validation 1 AUC: %.3f\nROMO1 Validation 2 AUC: %.3f\nTYK2 Training AUC: %.3f\nTYK2 Validation 1 AUC: %.3f\nTYK2 Validation 2 AUC: %.3f\nTCL1A Training AUC: %.3f\nTCL1A Validation 1 AUC: %.3f\nTCL1A Validation 2 AUC: %.3f",
+  roc_train_romo1$auc, roc_valid1_romo1$auc, roc_valid2_romo1$auc,
+  roc_train_tyk2$auc, roc_valid1_tyk2$auc, roc_valid2_tyk2$auc,
+  roc_train_tcl1a$auc, roc_valid1_tcl1a$auc, roc_valid2_tcl1a$auc
+)
+
+p <- p + annotate("text", x = 0.75, y = 0.25, label = auc_text, hjust = 0, vjust = 0, size = 3)
+
+print(p)
+
